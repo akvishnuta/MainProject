@@ -1,0 +1,111 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import javax.sound.sampled.*;
+
+
+/**
+ *
+ * @author Anil
+ */
+public class FFTMain {
+    static double HANDSHAKE_START_HZ = 8192;
+    static double HANDSHAKE_END_HZ = 8192 + 512;
+
+    static double START_HZ = 1024;
+    static double STEP_HZ = 256;
+    static double BITS = 4;
+
+    static double FEC_BYTES = 4;
+
+     public static void main(String[] args) {
+        AudioFormat format = new AudioFormat(44100.0f, 8, 1, true, true);
+        TargetDataLine microphone;
+       
+        try {
+            microphone = AudioSystem.getTargetDataLine(format);
+
+            DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+            microphone = (TargetDataLine) AudioSystem.getLine(info);
+            microphone.open(format);
+
+           
+            int numBytesRead;
+            int CHUNK_SIZE = 1024;
+            byte[] data = new byte[microphone.getBufferSize()];
+            microphone.start();
+
+            int bytesRead = 0;
+            DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, format);
+          
+            while (bytesRead < 10000000) {
+                numBytesRead = microphone.read(data, 0, CHUNK_SIZE);
+                fftPrint(data);
+                bytesRead += numBytesRead;
+                
+            }
+      
+            microphone.close();
+        } catch (LineUnavailableException e) {
+            e.printStackTrace();
+        } 
+       
+        
+        
+      
+       
+        
+    
+    }
+     
+     static boolean match(double freq1, double freq2){
+        return Math.abs(freq1 - freq2) < 20;
+       }
+     
+       static void fftPrint(byte[] waveArray){
+        
+        int len=waveArray.length;
+        double[] waveTransformReal=new double[len];
+        double[] waveTransformImg=new double[len];
+        for(int i=0;i<len;i++){
+            waveTransformReal[i]=waveArray[i];
+            }
+        
+        Fft.transform(waveTransformReal,waveTransformImg);
+       
+        //Calculating abs
+        double[] abs=new double[len];
+        
+        for(int i=0;i<len;i++){
+            abs[i]=(Math.sqrt(waveTransformReal[i]*waveTransformReal[i]+waveTransformImg[i]*waveTransformImg[i]));
+            //System.out.println("abs="+abs[i]);
+        }
+        //double maxValue=Collections.max(abs1, 2)));
+        //int maxIndex=abs1.indexOf(maxValue);
+        int maxIndex=0;
+        for(int i=0;i<len;i++){
+            if(abs[i]>abs[maxIndex])
+                maxIndex=i;
+        }
+         
+        double dominantFrequency=(maxIndex*44100)/len;
+         //System.out.println("Freq="+dominantFrequency);
+         if(match(dominantFrequency,HANDSHAKE_START_HZ)){
+             System.out.println("Found Handshake start freq :"+dominantFrequency);
+         }
+         if(match(dominantFrequency,HANDSHAKE_END_HZ)){
+             System.out.println("Found Handshake end freq :"+dominantFrequency);
+         }
+     }
+     
+
